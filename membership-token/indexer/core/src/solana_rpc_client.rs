@@ -10,8 +10,8 @@ use solana_transaction_status::{EncodedConfirmedTransaction, UiTransactionEncodi
 
 pub const TRANSACTIONS_BATCH_LEN: usize = 100;
 
-pub struct SolanaRpcClientConfig {
-    pub url: String,
+pub struct SolanaRpcClientConfig<'a> {
+    pub url: &'a str,
     pub program_address: Pubkey,
 }
 pub struct SolanaRpcClient {
@@ -22,7 +22,7 @@ pub struct SolanaRpcClient {
 impl SolanaRpcClient {
     pub fn new_with_config(config: SolanaRpcClientConfig) -> Self {
         SolanaRpcClient {
-            rpc_client: RpcClient::new(config.url),
+            rpc_client: RpcClient::new(config.url.to_string()),
             program_address: config.program_address,
         }
     }

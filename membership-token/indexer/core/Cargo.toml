@@ -1,5 +1,5 @@
 [package]
-name = "mpl_membership_token_indexer_core"
+name = "mpl_indexer_core"
 version = "0.1.0"
 edition = "2021"
 

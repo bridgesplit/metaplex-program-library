@@ -128,7 +128,7 @@ pub async fn run(
                 .db
                 .as_ref()
                 .unwrap()
-                .store_signatures_in_queue(signatures)
+                .store_signatures_in_queue(&signatures)
                 .unwrap();
         }
     }
@@ -145,14 +145,14 @@ async fn process_command(
 ) {
     match command {
         Command::Start { config } => {
-            start(config.url.to_string(), registry, tx).await;
+            start(config.url, registry, tx).await;
         }
         Command::Stop => {}
         Command::Load { .. } => {}
     }
 }
 
-async fn start(url: String, registry: &mut SignaturesLoaderRegistry, tx: &Sender<Message>) {
+async fn start(url: &str, registry: &mut SignaturesLoaderRegistry, tx: &Sender<Message>) {
     if SignaturesLoaderState::Started == registry.state {
         tx.send(Message::AlreadyStarted).unwrap();
     } else {

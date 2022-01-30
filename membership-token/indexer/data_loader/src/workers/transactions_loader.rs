@@ -135,14 +135,14 @@ async fn process_command(
     match command {
         Command::Start { channel_id, config } => {
             if registry.channel_id == channel_id {
-                start(config.url.to_string(), registry, tx).await;
+                start(config.url, registry, tx).await;
             }
         }
         Command::Stop => {}
     }
 }
 
-async fn start(url: String, registry: &mut TransactionsLoaderRegistry, tx: &Sender<Message>) {
+async fn start(url: &str, registry: &mut TransactionsLoaderRegistry, tx: &Sender<Message>) {
     if TransactionsLoaderState::Started == registry.state {
         tx.send(Message::AlreadyStarted).unwrap();
     } else {

@@ -1,2 +1,2 @@
 [workspace]
-members=["core", "indexer"]
+members=["core", "data_loader"]

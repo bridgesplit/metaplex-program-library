@@ -23,7 +23,7 @@ impl Db {
 
     pub fn store_signatures_in_queue(
         &self,
-        sgns: Vec<RpcConfirmedTransactionStatusWithSignature>,
+        sgns: &[RpcConfirmedTransactionStatusWithSignature],
     ) -> Result<(), Error> {
         for transaction_status in sgns.iter() {
             let new_signature = NewSignature {
