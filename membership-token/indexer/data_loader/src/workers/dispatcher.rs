@@ -3,7 +3,7 @@ use std::sync::Arc;
 
 use super::{signatures_loader, transactions_loader};
 
-use indexer_core::Db;
+use indexer_core::{Config, Db};
 use tokio::{
     sync::{
         broadcast::{self, Receiver, Sender},
@@ -17,7 +17,7 @@ struct Connection<C, M> {
     rx: Receiver<M>,
 }
 
-pub async fn run(mut stop_rx: Receiver<u8>, _stop_fb_tx: mpsc::Sender<()>) {
+pub async fn run(config: &Config, mut stop_rx: Receiver<u8>, _stop_fb_tx: mpsc::Sender<()>) {
     println!("Dispatcher::run()");
 
     let (stop_tx, _stop_rx) = broadcast::channel::<u8>(32);
@@ -29,9 +29,9 @@ pub async fn run(mut stop_rx: Receiver<u8>, _stop_fb_tx: mpsc::Sender<()>) {
 
     // The channels for communication with the workers
     let mut dispatcher_sgnloader_connection =
-        setup_and_start_signatures_loader(stop_tx.clone(), stop_fb_tx.clone()).await;
+        setup_and_start_signatures_loader(config, stop_tx.clone(), stop_fb_tx.clone()).await;
     let mut dispatcher_trnsloaders_connection =
-        setup_and_start_transactions_loaders(stop_tx.clone(), stop_fb_tx.clone()).await;
+        setup_and_start_transactions_loaders(config, stop_tx.clone(), stop_fb_tx.clone()).await;
 
     // We will not send something via this channel
     drop(stop_fb_tx);
@@ -56,6 +56,7 @@ pub async fn run(mut stop_rx: Receiver<u8>, _stop_fb_tx: mpsc::Sender<()>) {
 }
 
 async fn setup_and_start_signatures_loader(
+    config: &Config,
     stop_tx: broadcast::Sender<u8>,
     stop_fb_tx: mpsc::Sender<()>,
 ) -> Connection<signatures_loader::Command, signatures_loader::Message> {
@@ -78,10 +79,9 @@ async fn setup_and_start_signatures_loader(
         .await
     });
 
-    let config = signatures_loader::ConnectionConfig {
-        url: "https://api.mainnet-beta.solana.com",
+    let cmd = signatures_loader::Command::Start {
+        config: config.get_solana_rpc_client_config().clone(),
     };
-    let cmd = signatures_loader::Command::Start { config };
 
     dispatcher_sgnloader_tx.send(cmd).unwrap();
 
@@ -92,6 +92,7 @@ async fn setup_and_start_signatures_loader(
 }
 
 async fn setup_and_start_transactions_loaders(
+    config: &Config,
     stop_tx: Sender<u8>,
     stop_fb_tx: mpsc::Sender<()>,
 ) -> Connection<transactions_loader::Command, transactions_loader::Message> {
@@ -106,7 +107,11 @@ async fn setup_and_start_transactions_loaders(
     let db = Db::default();
     let db_mutex = Arc::new(Mutex::new(db));
 
-    for channel_id in 0..2 {
+    let number_of_transaction_loaders = config
+        .get_workers_pool_config()
+        .nunmber_of_transaction_loaders;
+
+    for channel_id in 0..number_of_transaction_loaders {
         let tx = trnsloader_dispatcher_tx.clone();
         let rx = dispatcher_trnsloader_tx.subscribe();
         let stp_tx = stop_tx.clone();
@@ -125,11 +130,10 @@ async fn setup_and_start_transactions_loaders(
             .await
         });
 
-        let config = transactions_loader::ConnectionConfig {
-            url: "https://api.mainnet-beta.solana.com",
+        let cmd = transactions_loader::Command::Start {
+            channel_id,
+            config: config.get_solana_rpc_client_config().clone(),
         };
-
-        let cmd = transactions_loader::Command::Start { channel_id, config };
 
         dispatcher_trnsloader_tx.send(cmd).unwrap();
     }

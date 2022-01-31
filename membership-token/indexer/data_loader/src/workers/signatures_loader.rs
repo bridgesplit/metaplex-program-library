@@ -1,10 +1,11 @@
 use indexer_core::{
     db::Db,
     solana_rpc_client::{self, SolanaRpcClient, TRANSACTIONS_BATCH_LEN},
+    SolanaRpcClientConfig,
 };
 
 use serde::{Deserialize, Serialize};
-use solana_sdk::{pubkey::Pubkey, signature::Signature};
+use solana_sdk::signature::Signature;
 use std::str::FromStr;
 use tokio::{
     fs,
@@ -28,9 +29,9 @@ pub struct SignaturesForAddressConfig {
     _until: Option<Signature>,
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone)]
 pub enum Command {
-    Start { config: ConnectionConfig },
+    Start { config: SolanaRpcClientConfig },
     Stop,
     Load { config: SignaturesForAddressConfig },
 }
@@ -145,23 +146,22 @@ async fn process_command(
 ) {
     match command {
         Command::Start { config } => {
-            start(config.url, registry, tx).await;
+            start(config, registry, tx).await;
         }
         Command::Stop => {}
         Command::Load { .. } => {}
     }
 }
 
-async fn start(url: &str, registry: &mut SignaturesLoaderRegistry, tx: &Sender<Message>) {
+async fn start(
+    config: SolanaRpcClientConfig,
+    registry: &mut SignaturesLoaderRegistry,
+    tx: &Sender<Message>,
+) {
     if SignaturesLoaderState::Started == registry.state {
         tx.send(Message::AlreadyStarted).unwrap();
     } else {
-        let solana_rpc_client_config = solana_rpc_client::SolanaRpcClientConfig {
-            url,
-            program_address: Pubkey::from_str("packFeFNZzMfD9aVWL7QbGz1WcU7R9zpf6pvNsw2BLu")
-                .unwrap(),
-        };
-        registry.rpc_client = Some(SolanaRpcClient::new_with_config(solana_rpc_client_config));
+        registry.rpc_client = Some(SolanaRpcClient::new_with_config(config));
         registry.state = SignaturesLoaderState::Started;
         registry.db = Some(Db::default());
         tx.send(Message::Started).unwrap();

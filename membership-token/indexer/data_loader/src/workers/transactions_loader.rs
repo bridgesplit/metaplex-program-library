@@ -1,8 +1,7 @@
 use parking_lot::Mutex;
-use std::{str::FromStr, sync::Arc};
+use std::sync::Arc;
 
-use indexer_core::{solana_rpc_client, Db, SolanaRpcClient};
-use solana_sdk::pubkey::Pubkey;
+use indexer_core::{solana_rpc_client, Db, SolanaRpcClient, SolanaRpcClientConfig};
 use tokio::{
     sync::{
         broadcast::{Receiver, Sender},
@@ -16,11 +15,11 @@ pub struct ConnectionConfig {
     pub url: &'static str,
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone)]
 pub enum Command {
     Start {
         channel_id: u8,
-        config: ConnectionConfig,
+        config: SolanaRpcClientConfig,
     },
     Stop,
 }
@@ -135,23 +134,22 @@ async fn process_command(
     match command {
         Command::Start { channel_id, config } => {
             if registry.channel_id == channel_id {
-                start(config.url, registry, tx).await;
+                start(config, registry, tx).await;
             }
         }
         Command::Stop => {}
     }
 }
 
-async fn start(url: &str, registry: &mut TransactionsLoaderRegistry, tx: &Sender<Message>) {
+async fn start(
+    config: SolanaRpcClientConfig,
+    registry: &mut TransactionsLoaderRegistry,
+    tx: &Sender<Message>,
+) {
     if TransactionsLoaderState::Started == registry.state {
         tx.send(Message::AlreadyStarted).unwrap();
     } else {
-        let solana_rpc_client_config = solana_rpc_client::SolanaRpcClientConfig {
-            url,
-            program_address: Pubkey::from_str("packFeFNZzMfD9aVWL7QbGz1WcU7R9zpf6pvNsw2BLu")
-                .unwrap(),
-        };
-        registry.rpc_client = Some(SolanaRpcClient::new_with_config(solana_rpc_client_config));
+        registry.rpc_client = Some(SolanaRpcClient::new_with_config(config));
         registry.state = TransactionsLoaderState::Started;
         registry.db = Some(Db::default());
         tx.send(Message::Started).unwrap();

@@ -1,0 +1,11 @@
+[Contract]
+id="packFeFNZzMfD9aVWL7QbGz1WcU7R9zpf6pvNsw2BLu"
+endpoint_url="https://api.mainnet-beta.solana.com"
+
+[DataStorage]
+type="postgresql"
+database_url="postgres://indexer_dev:password_dev@localhost/indexer_dev"
+
+[WorkersPool]
+nunmber_of_transaction_loaders=2
+

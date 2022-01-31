@@ -1,5 +1,6 @@
 pub mod workers;
 
+use indexer_core::{config_ini::ConfigIni, Config};
 use tokio::{
     signal,
     sync::{broadcast, mpsc},
@@ -7,12 +8,15 @@ use tokio::{
 
 #[tokio::main]
 async fn main() {
+    let config_global = Config::new::<ConfigIni>();
+
     let (stop_tx, _stop_rx) = broadcast::channel::<u8>(32);
     let (stop_fb_tx, mut stop_fb_rx) = mpsc::channel::<()>(1);
 
     let rx = stop_tx.subscribe();
     let stp_fb_tx = stop_fb_tx.clone();
-    let _ = tokio::spawn(async move { workers::dispatcher::run(rx, stp_fb_tx).await });
+    let _ =
+        tokio::spawn(async move { workers::dispatcher::run(&config_global, rx, stp_fb_tx).await });
 
     drop(stop_fb_tx);
 
