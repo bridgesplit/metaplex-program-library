@@ -16,16 +16,20 @@ pub enum StorageType {
     Undefined,
 }
 
+#[derive(Debug, Clone)]
+pub struct StorageConfig {
+    pub storage_type: StorageType,
+    pub database_url: String,
+}
+
 #[derive(Debug, Clone, Copy)]
 pub struct WorkersPoolConfig {
     pub nunmber_of_transaction_loaders: u8,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Config {
-    // Todo: storage_type and database_url should be combined into storage_config after Storage refactoring
-    storage_type: StorageType,
-    database_url: String,
+    storage_config: StorageConfig,
     solana_rpc_client_config: SolanaRpcClientConfig,
     workers_pool_config: WorkersPoolConfig,
 }
@@ -46,6 +50,11 @@ impl Config {
 
         let database_url =
             String::from_str(lodable_config.get("DataStorage", "database_url").unwrap()).unwrap();
+
+        let storage_config = StorageConfig {
+            storage_type,
+            database_url,
+        };
 
         let url =
             String::from_str(lodable_config.get("Contract", "endpoint_url").unwrap()).unwrap();
@@ -69,19 +78,14 @@ impl Config {
         };
 
         Config {
-            database_url,
-            storage_type,
+            storage_config,
             solana_rpc_client_config,
             workers_pool_config,
         }
     }
 
-    pub fn get_storage_type(&self) -> StorageType {
-        self.storage_type
-    }
-
-    pub fn get_database_url(&self) -> &str {
-        &self.database_url
+    pub fn get_storage_config(&self) -> &StorageConfig {
+        &self.storage_config
     }
 
     pub fn get_solana_rpc_client_config(&self) -> &SolanaRpcClientConfig {

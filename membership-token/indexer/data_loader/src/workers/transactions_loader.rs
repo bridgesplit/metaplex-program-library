@@ -1,7 +1,7 @@
 use parking_lot::Mutex;
 use std::sync::Arc;
 
-use indexer_core::{solana_rpc_client, Db, SolanaRpcClient, SolanaRpcClientConfig};
+use indexer_core::{solana_rpc_client, Config, SolanaRpcClient, Storage};
 use tokio::{
     sync::{
         broadcast::{Receiver, Sender},
@@ -17,10 +17,7 @@ pub struct ConnectionConfig {
 
 #[derive(Debug, Clone)]
 pub enum Command {
-    Start {
-        channel_id: u8,
-        config: SolanaRpcClientConfig,
-    },
+    Start { channel_id: u8, config: Config },
     Stop,
 }
 
@@ -43,7 +40,7 @@ struct TransactionsLoaderRegistry {
     channel_id: u8,
     state: TransactionsLoaderState,
     rpc_client: Option<solana_rpc_client::SolanaRpcClient>,
-    db: Option<Db>,
+    db: Option<Storage>,
 }
 
 pub async fn run(
@@ -52,7 +49,7 @@ pub async fn run(
     _stop_fb_tx: mpsc::Sender<()>,
     tx: Sender<Message>,
     mut rx: Receiver<Command>,
-    guarded_db: Arc<Mutex<Db>>,
+    guarded_storage: Arc<Mutex<Storage>>,
 ) {
     println!("TransactionsLoader{}::run()", channel_id);
 
@@ -83,9 +80,9 @@ pub async fn run(
         let record_id: Option<i32>;
 
         {
-            let db = guarded_db.lock();
+            let storage = guarded_storage.lock();
 
-            if let Ok(result) = db.get_signature_from_queue() {
+            if let Ok(result) = storage.get_signature_from_queue() {
                 record_id = Some(result.0);
                 signature = result.1;
             } else {
@@ -141,17 +138,15 @@ async fn process_command(
     }
 }
 
-async fn start(
-    config: SolanaRpcClientConfig,
-    registry: &mut TransactionsLoaderRegistry,
-    tx: &Sender<Message>,
-) {
+async fn start(config: Config, registry: &mut TransactionsLoaderRegistry, tx: &Sender<Message>) {
     if TransactionsLoaderState::Started == registry.state {
         tx.send(Message::AlreadyStarted).unwrap();
     } else {
-        registry.rpc_client = Some(SolanaRpcClient::new_with_config(config));
+        registry.rpc_client = Some(SolanaRpcClient::new_with_config(
+            config.get_solana_rpc_client_config(),
+        ));
         registry.state = TransactionsLoaderState::Started;
-        registry.db = Some(Db::default());
+        registry.db = Some(Storage::new(config.get_storage_config()));
         tx.send(Message::Started).unwrap();
     }
 }

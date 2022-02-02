@@ -30,8 +30,4 @@ table! {
 
 joinable!(signatures -> loading_statuses (loading_status));
 
-allow_tables_to_appear_in_same_query!(
-    loading_statuses,
-    signatures,
-    transactions,
-);
+allow_tables_to_appear_in_same_query!(loading_statuses, signatures, transactions,);

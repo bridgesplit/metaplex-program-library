@@ -21,7 +21,7 @@ pub struct SolanaRpcClient {
 }
 
 impl SolanaRpcClient {
-    pub fn new_with_config(config: SolanaRpcClientConfig) -> Self {
+    pub fn new_with_config(config: &SolanaRpcClientConfig) -> Self {
         SolanaRpcClient {
             rpc_client: RpcClient::new(config.url.to_string()),
             program_address: config.program_address,

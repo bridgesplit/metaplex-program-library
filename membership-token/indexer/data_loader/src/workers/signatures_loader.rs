@@ -1,7 +1,6 @@
 use indexer_core::{
-    db::Db,
     solana_rpc_client::{self, SolanaRpcClient, TRANSACTIONS_BATCH_LEN},
-    SolanaRpcClientConfig,
+    Config, Storage,
 };
 
 use serde::{Deserialize, Serialize};
@@ -31,7 +30,7 @@ pub struct SignaturesForAddressConfig {
 
 #[derive(Debug, Clone)]
 pub enum Command {
-    Start { config: SolanaRpcClientConfig },
+    Start { config: Config },
     Stop,
     Load { config: SignaturesForAddressConfig },
 }
@@ -54,7 +53,7 @@ pub enum SignaturesLoaderState {
 struct SignaturesLoaderRegistry {
     state: SignaturesLoaderState,
     rpc_client: Option<solana_rpc_client::SolanaRpcClient>,
-    db: Option<Db>,
+    storage: Option<Storage>,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -76,7 +75,7 @@ pub async fn run(
     let mut registry = SignaturesLoaderRegistry {
         state: SignaturesLoaderState::NotStarted,
         rpc_client: None,
-        db: None,
+        storage: None,
     };
 
     let mut saved_state = load_state().await;
@@ -124,9 +123,9 @@ pub async fn run(
                 Some(Signature::from_str(&signatures.iter().last().unwrap().signature).unwrap());
         };
 
-        if registry.db.is_some() {
+        if registry.storage.is_some() {
             registry
-                .db
+                .storage
                 .as_ref()
                 .unwrap()
                 .store_signatures_in_queue(&signatures)
@@ -146,24 +145,22 @@ async fn process_command(
 ) {
     match command {
         Command::Start { config } => {
-            start(config, registry, tx).await;
+            start(config, registry, tx);
         }
         Command::Stop => {}
         Command::Load { .. } => {}
     }
 }
 
-async fn start(
-    config: SolanaRpcClientConfig,
-    registry: &mut SignaturesLoaderRegistry,
-    tx: &Sender<Message>,
-) {
+fn start(config: Config, registry: &mut SignaturesLoaderRegistry, tx: &Sender<Message>) {
     if SignaturesLoaderState::Started == registry.state {
         tx.send(Message::AlreadyStarted).unwrap();
     } else {
-        registry.rpc_client = Some(SolanaRpcClient::new_with_config(config));
+        registry.rpc_client = Some(SolanaRpcClient::new_with_config(
+            config.get_solana_rpc_client_config(),
+        ));
         registry.state = SignaturesLoaderState::Started;
-        registry.db = Some(Db::default());
+        registry.storage = Some(Storage::new(config.get_storage_config()));
         tx.send(Message::Started).unwrap();
     }
 }

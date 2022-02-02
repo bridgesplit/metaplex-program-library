@@ -3,7 +3,7 @@ use std::sync::Arc;
 
 use super::{signatures_loader, transactions_loader};
 
-use indexer_core::{Config, Db};
+use indexer_core::{Config, Storage};
 use tokio::{
     sync::{
         broadcast::{self, Receiver, Sender},
@@ -80,7 +80,7 @@ async fn setup_and_start_signatures_loader(
     });
 
     let cmd = signatures_loader::Command::Start {
-        config: config.get_solana_rpc_client_config().clone(),
+        config: config.clone(),
     };
 
     dispatcher_sgnloader_tx.send(cmd).unwrap();
@@ -104,8 +104,8 @@ async fn setup_and_start_transactions_loaders(
     let (trnsloader_dispatcher_tx, trnsloader_dispatcher_rx) =
         broadcast::channel::<transactions_loader::Message>(32);
 
-    let db = Db::default();
-    let db_mutex = Arc::new(Mutex::new(db));
+    let storage = Storage::new(config.get_storage_config());
+    let storage_guarded = Arc::new(Mutex::new(storage));
 
     let number_of_transaction_loaders = config
         .get_workers_pool_config()
@@ -115,7 +115,7 @@ async fn setup_and_start_transactions_loaders(
         let tx = trnsloader_dispatcher_tx.clone();
         let rx = dispatcher_trnsloader_tx.subscribe();
         let stp_tx = stop_tx.clone();
-        let guarded_db = Arc::clone(&db_mutex);
+        let guarded_storage = Arc::clone(&storage_guarded);
         let stp_fb_tx = stop_fb_tx.clone();
 
         tokio::spawn(async move {
@@ -125,14 +125,14 @@ async fn setup_and_start_transactions_loaders(
                 stp_fb_tx,
                 tx,
                 rx,
-                guarded_db,
+                guarded_storage,
             )
             .await
         });
 
         let cmd = transactions_loader::Command::Start {
             channel_id,
-            config: config.get_solana_rpc_client_config().clone(),
+            config: config.clone(),
         };
 
         dispatcher_trnsloader_tx.send(cmd).unwrap();
