@@ -339,6 +339,10 @@ impl borsh::de::BorshDeserialize for Metadata {
         let md = meta_deser_unchecked(buf)?;
         Ok(md)
     }
+
+    fn deserialize_reader<R: std::io::Read>(reader: &mut R) -> std::io::Result<Self> {
+        Ok(Metadata::default())
+    }
 }
 
 #[repr(C)]
